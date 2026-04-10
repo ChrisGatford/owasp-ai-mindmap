@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OWASP AI Pen Test Methodology — HackLabs</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0D0D1A; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #fff; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+header { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background: #3B30C4; flex-shrink: 0; }
+.logo-area { display: flex; align-items: center; gap: 10px; }
+.logo-text { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+.header-title { text-align: center; flex: 1; }
+.header-title h1 { font-size: 14px; font-weight: 700; }
+.header-title p { font-size: 10px; color: rgba(255,255,255,0.65); margin-top: 2px; }
+.controls { display: flex; gap: 6px; }
+.btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fff; padding: 5px 10px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: 600; }
+.btn:hover { background: rgba(255,255,255,0.28); }
+#map-container { flex: 1; position: relative; overflow: hidden; }
+svg { width: 100%; height: 100%; cursor: grab; }
+svg:active { cursor: grabbing; }
+.tooltip { position: absolute; background: #1a1a2e; border: 1px solid #3B30C4; border-radius: 8px; padding: 10px 14px; font-size: 12px; max-width: 280px; pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 100; line-height: 1.5; box-shadow: 0 4px 24px rgba(0,0,0,0.5); }
+.tooltip.visible { opacity: 1; }
+.tooltip h4 { color: #7C6AF6; margin-bottom: 4px; font-size: 13px; }
+.tooltip p { color: rgba(255,255,255,0.8); }
+footer { text-align: center; padding: 5px; font-size: 9px; color: rgba(255,255,255,0.35); background: #3B30C4; flex-shrink: 0; }
+.legend { position: absolute; bottom: 12px; right: 12px; background: rgba(13,13,26,0.92); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 14px; font-size: 10px; }
+.legend-row { font-weight: 700; margin-bottom: 6px; color: #7C6AF6; font-size: 11px; }
+.legend-item { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.hint { position: absolute; bottom: 12px; left: 12px; background: rgba(13,13,26,0.92); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px 12px; font-size: 10px; color: rgba(255,255,255,0.5); line-height: 1.6; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo-area">
+    <svg width="30" height="30" viewBox="0 0 32 32" fill="none">
+      <ellipse cx="16" cy="16" rx="14" ry="6" stroke="white" stroke-width="2" fill="none"/>
+      <ellipse cx="16" cy="16" rx="14" ry="6" stroke="white" stroke-width="2" fill="none" transform="rotate(60 16 16)"/>
+      <ellipse cx="16" cy="16" rx="14" ry="6" stroke="white" stroke-width="2" fill="none" transform="rotate(120 16 16)"/>
+      <circle cx="16" cy="16" r="3" fill="white"/>
+    </svg>
+    <span class="logo-text">HackLabs</span>
+  </div>
+  <div class="header-title">
+    <h1>OWASP AI Penetration Testing Methodology v1</h1>
+    <p>Interactive Mind Map &middot; OWASP AI Testing Guide (November 2025)</p>
+  </div>
+  <div class="controls">
+    <button class="btn" onclick="expandAll()">Expand All</button>
+    <button class="btn" onclick="collapseAll()">Collapse</button>
+    <button class="btn" onclick="resetView()">Reset View</button>
+  </div>
+</header>
+<div id="map-container">
+  <svg id="svg"></svg>
+  <div class="tooltip" id="tooltip"></div>
+  <div class="legend">
+    <div class="legend-row">Testing Layers</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#E74C3C"></div>Threat Modeling</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#3B30C4"></div>Application (14 tests)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#8E44AD"></div>Model (7 tests)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#27AE60"></div>Infrastructure (6 tests)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#D35400"></div>Data (5 tests)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#16A085"></div>Engagement Phases</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#5D6D7E"></div>References</div>
+  </div>
+  <div class="hint">&#128432; Drag to pan &middot; Scroll to zoom<br>Click nodes to expand / collapse</div>
+</div>
+<footer>&copy; 2026 HackLabs Pty Ltd &mdash; Offensive Security Specialists &middot; www.hacklabs.com.au &middot; +61 1300 01 1337</footer>
+<script>
+const DESCS = {"APP-01 Prompt Injection":"Direct manipulation of the LLM via adversarially crafted user inputs designed to override instructions or extract sensitive information.","APP-02 Indirect Prompt Injection":"Injection through external data sources consumed by the model (RAG documents, emails, web pages, plugins).","APP-03 Sensitive Data Leak":"Model surfaces PII, API keys, credentials, or confidential business data in its outputs.","APP-04 Input Leakage":"Extracting system prompts, few-shot examples, or application context through inference.","APP-05 Unsafe Outputs":"Model generates malicious code, harmful instructions, or outputs that can be weaponised.","APP-06 Agentic Behaviour Limits":"Autonomous AI agent takes actions beyond its intended scope — data deletion, financial transactions, privilege escalation.","APP-07 Prompt Disclosure":"System prompt or guardrail logic is revealed, enabling targeted bypass.","APP-08 Embedding Manipulation":"Poisoning vector stores or RAG pipelines to influence model retrieval and generation.","APP-09 Model Extraction":"Stealing model weights, capabilities, or training data via systematic API queries.","APP-10 Content Bias":"Model exhibits unfair discrimination or harmful stereotyping across demographic groups.","APP-11 Hallucinations":"Model generates false information with high confidence — legal, medical, or operational risk.","APP-12 Toxic Output":"Model generates offensive, harmful, or policy-violating content.","APP-13 Over-Reliance on AI":"Humans or automated systems blindly trust AI decisions without appropriate oversight.","APP-14 Explainability":"Model outputs cannot be audited, explained, or justified — regulatory and liability risk.","MOD-01 Evasion Attacks":"Adversarial examples crafted to cause model misclassification while appearing normal to humans.","MOD-02 Runtime Poisoning":"Injecting malicious data at inference time to corrupt model behaviour.","MOD-03 Poisoned Training Sets":"Backdoors inserted during training — model behaves normally except on trigger inputs.","MOD-04 Membership Inference":"Determining whether specific data records were used in model training — privacy violation.","MOD-05 Inversion Attacks":"Reconstructing training data samples from model parameters or outputs.","MOD-06 Robustness to New Data":"Model fails catastrophically on distribution shifts, edge cases, or novel inputs.","MOD-07 Goal Alignment":"Model pursues proxy objectives that diverge from intended human values.","INF-01 Supply Chain Tampering":"Compromised pre-trained models, libraries, datasets, or fine-tuning pipelines.","INF-02 Resource Exhaustion":"DoS via expensive inference requests — sponge attacks, prompt flooding.","INF-03 Plugin Boundary Violations":"Escaping plugin or tool sandboxes to access unauthorised resources.","INF-04 Capability Misuse":"Abusing legitimate model capabilities for unintended malicious purposes.","INF-05 Fine-tuning Poisoning":"Inserting backdoors or biases through malicious fine-tuning.","INF-06 Dev-Time Model Theft":"Stealing model weights or IP during development, training, or deployment.","DAT-01 Training Data Exposure":"Extracting private, copyrighted, or sensitive data from the training corpus.","DAT-02 Runtime Exfiltration":"Data leaking via model outputs, embeddings, or side channels at runtime.","DAT-03 Dataset Diversity & Coverage":"Training data gaps leading to unsafe model behaviour on underrepresented inputs.","DAT-04 Harmful Content in Data":"Toxic, biased, or illegal content in training data influencing model outputs.","DAT-05 Data Minimisation & Consent":"Training data collected or used without appropriate consent or privacy compliance."};
+const DATA = {name:"OWASP AI Pen Test\nMethodology v1",color:"#3B30C4",children:[{name:"1. Threat Modeling",color:"#E74C3C",children:[{name:"Identify AI System Threats"},{name:"AI Architecture Layers\n(App · Model · Infra · Data)"},{name:"Map OWASP AI Threats\nto Architecture"},{name:"Responsible AI (RAI)\nThreat Identification"},{name:"Threat Categories",children:[{name:"Adversarial Manipulation"},{name:"Bias & Fairness Failures"},{name:"Sensitive Data Leakage"},{name:"Hallucinations"},{name:"Data / Model Poisoning"},{name:"Excessive Agency"},{name:"Goal Misalignment"},{name:"Model Drift"}]}]},{name:"2. Application Testing\n(AITG-APP)",color:"#3B30C4",children:[{name:"APP-01 Prompt Injection"},{name:"APP-02 Indirect Prompt Injection"},{name:"APP-03 Sensitive Data Leak"},{name:"APP-04 Input Leakage"},{name:"APP-05 Unsafe Outputs"},{name:"APP-06 Agentic Behaviour Limits"},{name:"APP-07 Prompt Disclosure"},{name:"APP-08 Embedding Manipulation"},{name:"APP-09 Model Extraction"},{name:"APP-10 Content Bias"},{name:"APP-11 Hallucinations"},{name:"APP-12 Toxic Output"},{name:"APP-13 Over-Reliance on AI"},{name:"APP-14 Explainability"}]},{name:"3. Model Testing\n(AITG-MOD)",color:"#8E44AD",children:[{name:"MOD-01 Evasion Attacks"},{name:"MOD-02 Runtime Poisoning"},{name:"MOD-03 Poisoned Training Sets"},{name:"MOD-04 Membership Inference"},{name:"MOD-05 Inversion Attacks"},{name:"MOD-06 Robustness to New Data"},{name:"MOD-07 Goal Alignment"}]},{name:"4. Infrastructure Testing\n(AITG-INF)",color:"#27AE60",children:[{name:"INF-01 Supply Chain Tampering"},{name:"INF-02 Resource Exhaustion"},{name:"INF-03 Plugin Boundary Violations"},{name:"INF-04 Capability Misuse"},{name:"INF-05 Fine-tuning Poisoning"},{name:"INF-06 Dev-Time Model Theft"}]},{name:"5. Data Testing\n(AITG-DAT)",color:"#D35400",children:[{name:"DAT-01 Training Data Exposure"},{name:"DAT-02 Runtime Exfiltration"},{name:"DAT-03 Dataset Diversity & Coverage"},{name:"DAT-04 Harmful Content in Data"},{name:"DAT-05 Data Minimisation & Consent"}]},{name:"6. Engagement Phases",color:"#16A085",children:[{name:"Scoping",children:[{name:"Define AI components in scope"},{name:"Identify model type\n(LLM / ML / Agentic)"},{name:"Map attack surface\n(API · UI · plugins · RAG)"},{name:"Threat model walkthrough"}]},{name:"Reconnaissance",children:[{name:"Model fingerprinting"},{name:"API endpoint discovery"},{name:"Plugin & tool enumeration"},{name:"Training data identification"}]},{name:"Testing",children:[{name:"Application layer (APP-01–14)"},{name:"Model layer (MOD-01–07)"},{name:"Infrastructure (INF-01–06)"},{name:"Data layer (DAT-01–05)"}]},{name:"Reporting",children:[{name:"OWASP AI VSS risk scoring"},{name:"MITRE ATLAS mapping"},{name:"Remediation recommendations"},{name:"Executive summary"}]}]},{name:"7. References",color:"#5D6D7E",children:[{name:"OWASP AI Testing Guide v1\n(Nov 2025)"},{name:"OWASP Top 10 for LLM 2025"},{name:"OWASP GenAI Red Teaming Guide"},{name:"OWASP AI Exchange\nowaspai.org"},{name:"NIST AI 100-2\n(AML Taxonomy)"},{name:"MITRE ATLAS\natlas.mitre.org"},{name:"CSA Agentic AI\nRed Teaming Guide"},{name:"Google SAIF"}]}]};
+const svg=d3.select("#svg"),cont=document.getElementById("map-container"),g=svg.append("g");
+const zoom=d3.zoom().scaleExtent([0.2,4]).on("zoom",e=>g.attr("transform",e.transform));
+svg.call(zoom);
+function propagateColor(d,c){if(!d.data.color)d.data._c=c;const nc=d.data.color||c;(d.children||[]).forEach(x=>propagateColor(x,nc));(d._children||[]).forEach(x=>propagateColor(x,nc));}
+const root=d3.hierarchy(DATA);root.x0=0;root.y0=0;
+root.children&&root.children.forEach(d=>{if(d.children){d._children=d.children;d.children=null;}});
+propagateColor(root,"#3B30C4");
+const layout=d3.tree().size([2*Math.PI,260]).separation((a,b)=>(a.parent===b.parent?1:2)/a.depth);
+const tip=document.getElementById("tooltip");
+function gc(d){return d.data.color||d.data._c||"#5D6D7E";}
+function update(src){
+  layout(root);
+  const nodes=root.descendants(),links=root.links();
+  nodes.forEach(d=>{d.y=d.depth===0?0:d.depth===1?200:d.depth===2?340:460;});
+  const lk=g.selectAll(".lk").data(links,d=>d.target.id||(d.target.id=Math.random()));
+  const lkE=lk.enter().append("path").attr("class","lk").attr("fill","none").attr("stroke-opacity",0.6);
+  lkE.merge(lk).transition().duration(350).attr("stroke",d=>gc(d.target)).attr("stroke-width",d=>d.target.depth===1?2.5:1.2).attr("d",d3.linkRadial().angle(d=>d.x).radius(d=>d.y));
+  lk.exit().transition().duration(350).attr("stroke-opacity",0).remove();
+  const nd=g.selectAll(".nd").data(nodes,d=>d.id||(d.id=Math.random()));
+  const ndE=nd.enter().append("g").attr("class","nd").attr("transform",()=>`rotate(${(src.x0||0)*180/Math.PI-90}) translate(${src.y0||0},0)`).attr("cursor","pointer")
+    .on("click",(ev,d)=>{if(d.children){d._children=d.children;d.children=null;}else{d.children=d._children;d._children=null;}if(d.children)propagateColor(d,gc(d));update(d);})
+    .on("mouseover",(ev,d)=>{const k=d.data.name.replace(/\n/g," ").trim(),desc=DESCS[k];if(desc){tip.innerHTML=`<h4>${k}</h4><p>${desc}</p>`;tip.classList.add("visible");}})
+    .on("mousemove",ev=>{tip.style.left=(ev.offsetX+14)+"px";tip.style.top=(ev.offsetY-10)+"px";})
+    .on("mouseout",()=>tip.classList.remove("visible"));
+  ndE.each(function(d){
+    const el=d3.select(this),color=gc(d),lines=d.data.name.split("\n"),isR=d.depth===0,isB=d.depth===1;
+    if(isR){el.append("rect").attr("x",-80).attr("y",-22).attr("width",160).attr("height",44).attr("rx",10).attr("fill",color).attr("stroke","rgba(255,255,255,0.3)").attr("stroke-width",1.5);}
+    else{const w=isB?120:110,h=lines.length>1?30:22;el.append("rect").attr("x",-w/2).attr("y",-h/2).attr("width",w).attr("height",h).attr("rx",5).attr("fill",isB?color:color+"55").attr("stroke",color).attr("stroke-width",isB?0:1);}
+    const tx=el.append("text").attr("text-anchor","middle").attr("dy",lines.length>1?-(lines.length-1)*6:"0.35em").attr("fill","#fff").attr("font-size",isR?"12px":isB?"9px":"8px").attr("font-weight",isR||isB?"700":"500").attr("pointer-events","none");
+    lines.forEach((ln,i)=>tx.append("tspan").attr("x",0).attr("dy",i===0?0:"1.2em").text(ln));
+    if(d._children)el.append("circle").attr("class","xd").attr("cx",isB?65:57).attr("cy",0).attr("r",4).attr("fill",color).attr("stroke","#fff").attr("stroke-width",1);
+  });
+  const ndU=ndE.merge(nd);
+  ndU.transition().duration(350).attr("transform",d=>`rotate(${d.x*180/Math.PI-90}) translate(${d.y},0)`);
+  ndU.selectAll(".xd").attr("fill",d=>gc(d)).attr("opacity",d=>d._children?1:0);
+  nd.exit().transition().duration(350).attr("opacity",0).remove();
+  nodes.forEach(d=>{d.x0=d.x;d.y0=d.y;});
+}
+function resetView(){const w=cont.clientWidth,h=cont.clientHeight;svg.transition().duration(500).call(zoom.transform,d3.zoomIdentity.translate(w/2,h/2).scale(0.82));}
+function expandAll(){function ex(d){if(d._children){d.children=d._children;d._children=null;}if(d.children){d.children.forEach(ex);propagateColor(d,gc(d));}}ex(root);update(root);}
+function collapseAll(){root.children&&root.children.forEach(d=>{if(d.children){d._children=d.children;d.children=null;}});update(root);}
+update(root);setTimeout(resetView,100);
+window.expandAll=expandAll;window.collapseAll=collapseAll;window.resetView=resetView;
+window.addEventListener("resize",()=>update(root));
+</script>
+</body>
+</html>
